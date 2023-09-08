@@ -262,7 +262,13 @@ def self_tokenize(self, prompt):
         truncation=True,
         return_tensors="pt",
     ).input_ids
-    return text_inputs
+    text_tokens = self.tokenizer.convert_ids_to_tokens(text_inputs[0])
+    text_dict = {}
+    for i, token in enumerate(text_tokens):
+        text_dict[i] = token
+        if "endoftext" in token:
+            break
+    return text_dict
 
 # check the usage of gpu
 # def use_gpu(used_percentage=0.2):
@@ -363,9 +369,12 @@ def return_group_self_attn_map(layer):
             attn_map_single = attn_mean_layer.reshape(-1, size, size)
             np_img = to_norm(np.mean(attn_map_single, axis=0)) if np_img is None else np.concatenate((np_img, to_norm(np.mean(attn_map_single, axis=0))), axis=1)
     height, length = np_img.shape[0], np_img.shape[1]
-    while length > height * 3:
-        np_img = np.concatenate((np_img[:,:int(length//2)], np_img[:,int(length//2):]),axis=0)
-        height, length = np_img.shape[0], np_img.shape[1]
+    if 'up_blocks.0' in layer:
+        np_img = np.concatenate((np_img[:,:int(length//5)], np_img[:,int(length//5):2*int(length//5)],  np_img[:,int(length//5)*2:3*int(length//5)],  np_img[:, int(length//5)*3:4*int(length//5)],  np_img[:,int(length//5)*4:]),axis=0)
+    else:
+        while length > height * 3:
+            np_img = np.concatenate((np_img[:,:int(length//2)], np_img[:,int(length//2):]),axis=0)
+            height, length = np_img.shape[0], np_img.shape[1]
     attn_img = Image.fromarray((np_img * 255).astype(np.uint8))
     return attn_img
 
@@ -402,7 +411,7 @@ if __name__ ==  "__main__":
                 inp = gr.Textbox(placeholder="Input prompts", label='Prompts',)
                 seed = gr.Textbox(placeholder="Seed", label='Seed', value="-1")
                 model_path = gr.Textbox(label='Model path', placeholder="Model path", value="/path/to/sdxl_model/sd_xl_base_1.0.safetensors")
-                out_token_idx = gr.Textbox(placeholder="Token index 0", label='Token_idx',)
+                out_token_idx = gr.Textbox(placeholder="Token index 0", label='Token&IDs Mapping',)
             with gr.Column(scale=1):
                 out_img = gr.Image(shape=(256, 256))
             with gr.Column(scale=1):
